@@ -1,60 +1,45 @@
-import numpy as np      # Импорт NumPy для работы с массивами (изображениями как матрицами)
-import cv2 as cv        # Импорт OpenCV для компьютерного зрения (обработка изображений, контуры и т.д.)
-from skimage import data  # Импорт модуля data из scikit-image для загрузки тестовых изображений
+import numpy as np      
+import cv2 as cv        
+from skimage import data
 
-# Загрузка тестового изображения "coins" (серое изображение с монетами)
+def finding_contours(imgray):
+    # Применение детектора краёв Canny для выделения границ объектов на изображении
+    edges = cv.Canny(imgray, 50, 150)
+
+    ret, thresh = cv.threshold(edges, 127, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+
+    # Создание ядра (структурирующего элемента) размером 3x3 для морфологических операций 
+    kernel = np.ones((3,3), np.uint8)
+
+    # Морфологическая операция "закрытие" (MORPH_CLOSE): сначала дилатация, потом эрозия
+    # Это заполняет небольшие дыры внутри объектов и соединяет близкие компоненты на бинарном изображении
+    thresh = cv.morphologyEx(thresh, cv.MORPH_CLOSE, kernel)
+
+    # Поиск всех внешних контуров на бинарном изображении
+    # Режим RETR_EXTERNAL — только внешние контуры; CHAIN_APPROX_SIMPLE — сжатие горизонтальных/вертикальных/диагональных сегментов
+    contours, hierarchy = cv.findContours(thresh, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+
+    # Установка минимальной и максимальной площади контуров для фильтрации (монеты среднего размера)
+    min_area = 200
+    max_area = 5000
+    filtered_contours = []
+
+    for cnt in contours:
+        area = cv.contourArea(cnt)  # Вычисление площади контура
+        if min_area < area < max_area:  # Фильтрация: только контуры с площадью от 200 до 5000 пикселей
+            filtered_contours.append(cnt)  # Добавление подходящего контура в список
+    
+    return filtered_contours
+
 imgray = data.coins()
-# Проверка, что изображение загружено успешно (assert выдаст ошибку, если файл недоступен)
 assert imgray is not None, "file could not be read, check with os.path.exists()"
 
-# Закомментированная строка: сохранение оригинального изображения в 'gray.png'
-# cv.imwrite('gray.png', imgray);
-
-# Применение детектора краёв Canny для выделения границ объектов на изображении
-# Параметры: нижний и верхний пороги (50 и 150) для определения сильных/слабых краёв
-edges = cv.Canny(imgray, 50, 150)
-
-# Закомментированная строка: сохранение изображения с краями в 'canny.png'
-# cv.imwrite('canny.png', edges)
-
-# Бинаризация изображения краёв с использованием порога Отсу (автоматический расчёт оптимального порога)
-# Порог 127 — начальный, но THRESH_OTSU переопределяет его; результат — бинарное изображение (0 или 255)
-ret, thresh = cv.threshold(edges, 127, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-
-# Закомментированная строка: сохранение бинаризованного изображения в 'thresh.png'
-# cv.imwrite('thresh.png', thresh)
-
-# Создание ядра (структурирующего элемента) размером 3x3 для морфологических операций (все элементы = 1, тип uint8)
-kernel = np.ones((3,3), np.uint8)
-
-# Морфологическая операция "закрытие" (MORPH_CLOSE): сначала дилатация, потом эрозия
-# Это заполняет небольшие дыры внутри объектов и соединяет близкие компоненты на бинарном изображении
-thresh = cv.morphologyEx(thresh, cv.MORPH_CLOSE, kernel)
-
-# Поиск всех внешних контуров на бинарном изображении
-# Режим RETR_EXTERNAL — только внешние контуры; CHAIN_APPROX_SIMPLE — сжатие горизонтальных/вертикальных/диагональных сегментов
-contours, hierarchy = cv.findContours(thresh, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-
-# Установка минимальной и максимальной площади контуров для фильтрации (монеты среднего размера)
-min_area = 200
-max_area = 5000
-
-# Инициализация списка для отфильтрованных контуров
-filtered_contours = []
-
-# Цикл по всем найденным контурам (ОШИБКА ЗДЕСЬ: неправильный отступ для if — в оригинале if внутри for без отступа,
-# что вызовет SyntaxError или некорректное выполнение; исправлено ниже для примера)
-for cnt in contours:
-    area = cv.contourArea(cnt)  # Вычисление площади контура
-    if min_area < area < max_area:  # Фильтрация: только контуры с площадью от 200 до 5000 пикселей
-        filtered_contours.append(cnt)  # Добавление подходящего контура в список
+contours = finding_contours(imgray)
 
 # Отрисовка отфильтрованных контуров на оригинальном изображении (imgray)
 # -1 — все контуры; цвет (0,255,0) — зелёный (BGR); толщина 3 пикселя
-cv.drawContours(imgray, filtered_contours, -1, (0,255,0), 3)
+cv.drawContours(imgray, contours, -1, (0,255,0), 3)
 
-# Сохранение результата (изображение с нарисованными контурами) в файл 'res.png'
 cv.imwrite('res.png', imgray)
 
-# Вывод количества отфильтрованных контуров в консоль
-print(len(filtered_contours))
+print(len(contours))
